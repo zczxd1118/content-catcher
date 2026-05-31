@@ -1,0 +1,17 @@
+# 敏感配置（千万别提交）
+.smtp_secret
+*.env
+
+# 产物（每次运行都会重新生成）
+output/
+models/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# 用户的真实订阅清单（含邮箱），不要提交
+channels.yaml
+my_videos.txt
+autoglm_urls.txt

@@ -1,0 +1,51 @@
+# 订阅配置示例
+# 复制为 channels.yaml 并填入你自己的关注列表
+#
+# 支持三种订阅源：
+#   - youtube_channel: YouTube 频道（推荐用 RSS，免 API key）
+#   - bilibili_uploader: B 站 up 主
+#   - rss: 任意 RSS feed（小宇宙、苹果播客、播客通用）
+
+newsletter:
+  name: "周小丁的 AI 周报"
+  email_to: "your-email@example.com"   # 收件箱
+  email_from: "your-email@example.com" # 发件箱
+  smtp:
+    host: "smtp.qq.com"
+    port: 465
+    use_ssl: true
+    user: "your-email@qq.com"
+    # 密码从环境变量 SMTP_PASS 读取（不要写在文件里）
+
+# 默认抓取参数
+defaults:
+  days: 7              # 抓近多少天的新内容
+  max_per_channel: 3   # 每个频道最多 N 个新视频
+  cookies_from: null   # 全局 cookies 来源（safari/chrome/null）
+
+# 订阅的频道
+channels:
+  # ===== YouTube =====
+  - type: youtube_channel
+    name: "Lex Fridman"
+    # 用 channel_id（频道页 URL 里 /channel/UCxxx）
+    channel_id: "UCSHZKyawb77ixDdsGog4iWA"
+    enabled: true
+
+  - type: youtube_channel
+    name: "Latent Space"
+    # 也可以用 handle（@xxxx 格式）
+    handle: "@latentspace"
+    enabled: false
+
+  # ===== B 站 =====
+  - type: bilibili_uploader
+    name: "影视飓风"
+    mid: "946974"     # B 站用户 mid（个人页 URL 里 /数字）
+    enabled: false
+
+  # ===== RSS（小宇宙、播客等通用） =====
+  - type: rss
+    name: "AI 炼金术"
+    url: "https://feeds.xiaoyuzhoufm.com/podcast/xxxxx.xml"
+    enabled: false
