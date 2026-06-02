@@ -131,18 +131,91 @@ python catch.py "https://www.latent.space/p/daytona" --deep
 
 ## 📡 订阅周报
 
+### 1️⃣ 初次配置
+
 ```bash
-# 1. 配 channels.yaml（参考 channels.example.yaml）
+# A. 复制订阅模板
 cp channels.example.yaml channels.yaml
-# 用 manage_channels.py 加订阅源
-python scripts/manage_channels.py add-bili 25752587 "你关注的 up 主"
-
-# 2. 配 SMTP（持久化）
+# B. 编辑 email_to / email_from / smtp.user 改成你的邮箱
+# C. 配 SMTP 授权码（持久化，不用每次 export）
 echo "SMTP_PASS=你的QQ邮箱授权码" > .smtp_secret  # 已加进 .gitignore
-
-# 3. 跑订阅 + 发邮件
-python catch.py --subscribe channels.yaml --send-email
 ```
+
+### 2️⃣ 跑订阅
+
+```bash
+# 仅生成投喂包（不发邮件，调试时用）
+python catch.py --subscribe channels.yaml
+
+# 全自动 + 发邮件（每周一次）
+python catch.py --subscribe channels.yaml --auto --send-email
+```
+
+### 3️⃣ 修改订阅清单（重点 ⭐）
+
+**两种方法,任选其一:**
+
+#### 方法 A：用 `manage_channels.py` 工具（推荐，无需手编 YAML）
+
+```bash
+# 看现在订了什么
+python scripts/manage_channels.py list
+
+# 加 B 站 up 主（mid 在 space.bilibili.com/XXXXXXX 的 URL 里）
+python scripts/manage_channels.py add-bili 25752587 "大牙大-"
+
+# 加 YouTube 频道（channel_id 是 UC 开头那一串）
+python scripts/manage_channels.py add-youtube UCJIfeSCssxSC_Dhc5s7woww "Lex Fridman"
+
+# 加 RSS 播客（小宇宙 / 苹果播客 / Substack）
+python scripts/manage_channels.py add-rss "https://www.xiaoyuzhoufm.com/podcast/xxx/feed.xml" "张小珺"
+
+# 临时关闭某个频道（不删除）
+python scripts/manage_channels.py disable "Lex Fridman"
+
+# 重新启用
+python scripts/manage_channels.py enable "Lex Fridman"
+
+# 彻底删除
+python scripts/manage_channels.py remove "Lex Fridman"
+```
+
+#### 方法 B：直接编辑 `channels.yaml`
+
+```yaml
+channels:
+  - type: bilibili_uploader
+    name: "大牙大-"
+    mid: "25752587"
+    cookies_from: chrome
+    enabled: true       # ← 改成 false 即可临时关闭
+
+  - type: youtube_channel
+    name: "Lex Fridman"
+    channel_id: "UCJIfeSCssxSC_Dhc5s7woww"
+    enabled: true
+
+  - type: rss
+    name: "张小珺商业访谈录"
+    rss_url: "https://feed.xyz/zhangxiaojun"
+    enabled: true
+```
+
+### 4️⃣ 各平台 ID 怎么找
+
+| 平台 | ID 在哪里 | 例子 |
+|------|---------|------|
+| **B 站 up 主** | `space.bilibili.com/XXXXXXX` URL 里的数字 | `25752587` |
+| **YouTube 频道** | 频道主页源码里搜 `"channelId":"UC..."` | `UCJIfeSCssxSC_Dhc5s7woww` |
+| **小宇宙节目** | 节目页源码搜 `feed.xml` | `https://www.xiaoyuzhoufm.com/podcast/xxx/feed.xml` |
+| **Substack 播客** | `<站名>.substack.com/feed` | 自动探测，也可手动 |
+| **苹果播客** | 用 castro.fm/itunes 转换 | RSS URL |
+
+### 5️⃣ 修改订阅后立即生效
+
+修改完 `channels.yaml` 后**下次跑 `--subscribe` 自动用新清单**，不需要重启什么。
+
+📌 提示：`output/digest/history.json` 存"已发过的视频"，**改订阅清单不会重置历史** —— 避免你换 up 主后老视频又重发。
 
 ---
 
