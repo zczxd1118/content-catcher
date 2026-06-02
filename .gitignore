@@ -15,3 +15,6 @@ __pycache__/
 channels.yaml
 my_videos.txt
 autoglm_urls.txt
+
+# 本地私人偏好（仅在本机）
+LOCAL_NOTES.md
