@@ -88,6 +88,46 @@ python catch.py --subscribe channels.yaml --days 3
 - **`.smtp_secret` 是 KEY=VAL 格式（含注释行）**，不要用 `export SMTP_PASS="$(cat .smtp_secret)"` 整段塞环境变量——会把注释也当 token，登录失败。`email_sender.py` 自带 fallback 解析，让脚本自己读就行（直接 `python catch.py --send-email`，**不要**预先 export）。
 - **中文标题/中文附件名/中文正文**：v0.7.1+ 已修。`EmailMessage` 默认 policy 是 `compat32`（ASCII-only），所以构造时强制传 `policy=SMTP_POLICY` 并给 `set_content`/`add_alternative` 加 `charset="utf-8"`。如果再次出现 `'ascii' codec can't encode characters`，先检查 `email_sender.py` 是不是被退回了旧版。
 
+### 📚 EPUB 生成：投喂包 ≠ 成品（v0.7.2 重要变更）
+
+**老版本陷阱**：`build_epub_if_many` 直接把投喂包（含"请你做..."的 LLM 任务说明 + Whisper 原始转写）当章节塞进 EPUB，导致读者打开 EPUB 看到的是给 LLM 看的输入而不是优美文章。
+
+**v0.7.2+ 新设计**：
+
+EPUB 章节按这个优先级取（在 `digest._find_polished_chapter`）：
+
+1. `output/digest/<本期>/chapter-<slug>.md` ← 你/Claude 在 digest 目录里写的代笔单章（首选）
+2. `output/final/<slug>/笔记.md` ← 长期收藏的精装版（如 Daytona、Vibe Coding 这种）
+3. **占位章节**（只放标题+链接+一句"该集尚未代笔"，**不再塞投喂包**）
+
+**新工作流**：
+
+```bash
+# 1) 抓取（同前）
+catch.py --subscribe channels.yaml
+# → 出投喂包 .WEEKLY.prompt.md + 自动 EPUB（如果 ≥ threshold 条）
+#   不够 threshold 就只有投喂包
+
+# 2) 你（或对话方 Claude）打开投喂包
+#    每条投喂包 → 写一份代笔单章 → 存到本期 digest 目录：
+#    output/digest/<本期>/chapter-<视频标题缩写>.md
+#    模板：templates/chapter_polished.md
+
+# 3) 重做 EPUB（用代笔单章替换占位）
+catch.py --subscribe channels.yaml --finalize-epub <本期目录名>
+
+# 4) 发邮件（EPUB 自动作为附件）
+catch.py --subscribe channels.yaml --send-only <本期目录名>
+```
+
+**调阈值**：`--epub-threshold N` 改自动 EPUB 触发线（默认 5）。订阅源少时可以临时调到 1–2。
+
+**对话方 Claude 看到投喂包应该想到**：
+
+- 短的（< 2000 字）→ 直接整理成 chapter 单章
+- 长的（如 Latent Space Daytona 那种 9 万字 + 8 段切片）→ 做成精装版放 `output/final/<slug>/笔记.md`，EPUB 会自动捡起来
+- 不重要 / 主题偏移的 → 跳过，留占位章节即可（读者打开看到提示就懂）
+
 ## ⚙️ 参数速查
 
 | 参数 | 用途 |

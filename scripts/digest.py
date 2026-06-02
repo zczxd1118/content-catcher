@@ -184,8 +184,73 @@ def auto_generate_weekly(root: Path, weekly_prompt_path: Path) -> Path | None:
     return final
 
 
-def build_epub_if_many(root: Path, bundle: dict, threshold: int = 5) -> Path | None:
-    """如果本周内容 >= threshold，把所有处理过的内容打包成 EPUB。"""
+def _slugify_title(title: str) -> str:
+    """把标题转成可作文件名的 slug（保留中英文，去掉特殊字符）。"""
+    import re
+    s = re.sub(r"[\\/:*?\"<>|\r\n\t]+", "_", title or "untitled").strip()
+    return s[:80]  # 文件名长度兜底
+
+
+def _find_polished_chapter(root: Path, out_dir: Path, record: dict) -> tuple[str, str] | None:
+    """按优先级找一个章节的"代笔成品"。
+
+    查找顺序：
+      1. <out_dir>/chapter-<slug>.md   ← 本期 digest 目录里的代笔单章（首选）
+      2. <root>/output/final/<slug>/   下的 笔记.md / *.md  ← 长期收藏的精装版
+      3. None                          ← 没找到，调用方决定怎么 fallback
+
+    返回 (章节标题, 章节 Markdown 正文) 或 None。
+    """
+    title = record.get("title") or "未命名"
+    slug = _slugify_title(title)
+
+    # 1) digest 目录下 chapter-<slug>.md
+    candidate = out_dir / f"chapter-{slug}.md"
+    if candidate.exists():
+        return (title, candidate.read_text(encoding="utf-8"))
+
+    # 2) output/final/<slug>/ 下的 笔记.md
+    final_dir = root / "output" / "final" / slug
+    if final_dir.is_dir():
+        for name in ("笔记.md", "note.md", "index.md", f"{slug}.md"):
+            f = final_dir / name
+            if f.exists():
+                return (title, f.read_text(encoding="utf-8"))
+        # 退而求其次：拿目录里第一个 .md
+        mds = sorted(final_dir.glob("*.md"))
+        if mds:
+            return (title, mds[0].read_text(encoding="utf-8"))
+
+    return None
+
+
+def _placeholder_chapter(record: dict) -> tuple[str, str]:
+    """没有代笔成品时的占位章节：只放标题、链接、来源、转写概要——
+    绝不把投喂包（含 LLM 任务说明 + 原始字幕）整段塞 EPUB。"""
+    title = record.get("title") or "未命名"
+    md = (
+        f"# {title}\n\n"
+        f"> ⏳ 该集尚未代笔，本章仅保留元信息。\n\n"
+        f"- **来源**：{record.get('source_name', '—')}\n"
+        f"- **链接**：{record.get('url', '—')}\n"
+        f"- **平台**：{record.get('platform', '—')}\n\n"
+        f"---\n\n"
+        f"想看完整的优美文章版本？\n\n"
+        f"1. 在 `output/digest/<本期目录>/` 下创建 `chapter-{_slugify_title(title)}.md`，写入代笔正文；\n"
+        f"2. 跑 `catch.py --subscribe channels.yaml --finalize-epub <本期目录>` 重做 EPUB。\n"
+    )
+    return (title, md)
+
+
+def build_epub_if_many(root: Path, bundle: dict, threshold: int = 5,
+                       require_polished: bool = True) -> Path | None:
+    """把本周内容打包成 EPUB。
+
+    - threshold：少于多少条就不出 EPUB。
+    - require_polished：True 时优先用代笔成品，找不到的条目用占位章节
+      （只放标题+链接+提示，不塞投喂包）。设为 False 退化到旧行为
+      （把投喂包整段当章节，仅供 debug，**不建议**）。
+    """
     if bundle["items_processed"] < threshold:
         return None
     try:
@@ -193,26 +258,48 @@ def build_epub_if_many(root: Path, bundle: dict, threshold: int = 5) -> Path | N
     except ImportError:
         return None
 
-    chapters = []
+    out_dir = bundle["out_dir"]
+    chapters: list[tuple[str, str]] = []
+    polished_count = 0
+    placeholder_count = 0
+
     for r in bundle.get("epub_candidates", []):
-        bp = r.get("bundle_path")
-        if not bp or not Path(bp).exists():
-            continue
-        content = Path(bp).read_text(encoding="utf-8")
-        # 直接把 prompt md 内容当章节
-        chapters.append((r.get("title", "未命名"), content))
+        if require_polished:
+            ch = _find_polished_chapter(root, out_dir, r)
+            if ch is not None:
+                chapters.append(ch)
+                polished_count += 1
+            else:
+                chapters.append(_placeholder_chapter(r))
+                placeholder_count += 1
+        else:
+            # 旧行为（不推荐）：把投喂包当章节
+            bp = r.get("bundle_path")
+            if not bp or not Path(bp).exists():
+                continue
+            chapters.append(
+                (r.get("title", "未命名"),
+                 Path(bp).read_text(encoding="utf-8"))
+            )
 
     if not chapters:
         return None
 
-    out = bundle["out_dir"] / f"{bundle['digest_name']}.epub"
+    out = out_dir / f"{bundle['digest_name']}.epub"
     export_epub(
         title=f"周报 {datetime.now().strftime('%Y-%m-%d')}",
         author="content-catcher",
         chapters=chapters,
         out_path=out,
     )
-    print(f"\n📚 已生成 EPUB：{out}")
+    if require_polished:
+        print(f"\n📚 已生成 EPUB：{out}")
+        print(f"   代笔章节：{polished_count} / 占位章节：{placeholder_count}")
+        if placeholder_count:
+            print(f"   💡 想替换占位章节，写代笔单章后跑：")
+            print(f"      catch.py --subscribe <yaml> --finalize-epub {out_dir.name}")
+    else:
+        print(f"\n📚 已生成 EPUB（debug 模式，章节为投喂包原文）：{out}")
     return out
 
 

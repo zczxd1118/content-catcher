@@ -270,6 +270,12 @@ def main():
                         help="跳过抓取，直接把指定 digest 目录里现成的 weekly-digest.md 发邮件 "
                              "（Claude 代笔后用这个一键发出）。"
                              "传入 digest 目录名（如 weekly-2026-W22-20260529）")
+    parser.add_argument("--finalize-epub", dest="finalize_epub", default=None,
+                        help="跳过抓取，根据指定 digest 目录里 chapter-*.md 代笔单章 + "
+                             "weekly-digest.md 重新生成 EPUB。"
+                             "代笔流程：写完 chapter-<slug>.md 再跑这条命令。")
+    parser.add_argument("--epub-threshold", dest="epub_threshold", type=int, default=5,
+                        help="自动生成 EPUB 的最低条目数（默认 5）")
     parser.add_argument("--no-cache", action="store_true",
                         help="不使用链接级缓存，强制重抓")
     parser.add_argument("--auto", action="store_true", help="调 LLM API 全自动")
@@ -340,6 +346,55 @@ def main():
         send_weekly_email(scan_min, body_md, attachments=attachments)
         return
 
+    # ===== --finalize-epub：根据代笔单章重做 EPUB =====
+    if args.finalize_epub:
+        from export_epub import export_epub
+
+        digest_dir = ROOT / "output" / "digest" / args.finalize_epub
+        if not digest_dir.exists():
+            print(f"❌ 找不到 digest 目录：{digest_dir}")
+            sys.exit(1)
+
+        # 1. 收集所有 chapter-*.md 当章节（按文件名排序）
+        chapter_files = sorted(digest_dir.glob("chapter-*.md"))
+
+        # 2. 头/尾装订：weekly-digest.md 当卷首语
+        weekly_md = digest_dir / "weekly-digest.md"
+
+        chapters: list[tuple[str, str]] = []
+        if weekly_md.exists():
+            chapters.append(("📖 卷首语 · 本周编辑", weekly_md.read_text(encoding="utf-8")))
+
+        for cf in chapter_files:
+            content = cf.read_text(encoding="utf-8")
+            # 从正文第一行的 # 标题里提取章节名；没有就用文件名
+            title = cf.stem.replace("chapter-", "", 1)
+            for line in content.splitlines()[:10]:
+                line = line.strip()
+                if line.startswith("# "):
+                    title = line[2:].strip()
+                    break
+            chapters.append((title, content))
+
+        if not chapters:
+            print(f"❌ {digest_dir} 里既没有 weekly-digest.md 也没有 chapter-*.md")
+            print(f"   请先写至少一份代笔单章（chapter-<slug>.md）或周报正文（weekly-digest.md）")
+            sys.exit(1)
+
+        out = digest_dir / f"{args.finalize_epub}.epub"
+        export_epub(
+            title=f"{args.finalize_epub}",
+            author="content-catcher × Claude",
+            chapters=chapters,
+            out_path=out,
+            language="zh",
+        )
+        print(f"\n📚 已重做 EPUB：{out}（{out.stat().st_size:,} bytes）")
+        print(f"   章节数：{len(chapters)}（卷首语 1 + 代笔 {len(chapter_files)}）")
+        print(f"\n下一步：")
+        print(f"  catch.py --subscribe <yaml> --send-only {args.finalize_epub}")
+        return
+
     # ===== 订阅模式 =====
     if args.subscribe_file:
         from subscribe import scan_all
@@ -389,7 +444,7 @@ def main():
             final_md = auto_generate_weekly(ROOT, bundle["weekly_prompt_path"])
 
         # EPUB
-        epub_path = build_epub_if_many(ROOT, bundle, threshold=5)
+        epub_path = build_epub_if_many(ROOT, bundle, threshold=args.epub_threshold)
 
         # 邮件
         if args.send_email:
