@@ -1,51 +1,67 @@
-# 订阅配置示例
-# 复制为 channels.yaml 并填入你自己的关注列表
+# =============================================================================
+# 订阅配置示例 v0.2
+# =============================================================================
+# 第一次使用：把本文件复制为 channels.yaml 后修改即可
+#     cp channels.example.yaml channels.yaml
 #
-# 支持三种订阅源：
-#   - youtube_channel: YouTube 频道（推荐用 RSS，免 API key）
-#   - bilibili_uploader: B 站 up 主
-#   - rss: 任意 RSS feed（小宇宙、苹果播客、播客通用）
+# 完整说明（改主题、加/删/启停源、各平台 ID 怎么找、踩坑提示）：
+#     docs/SUBSCRIPTION_GUIDE.md
+#
+# 支持的 type:
+#   - bilibili_uploader  B 站 UP 主（需登录 cookies）
+#   - youtube_channel    YouTube 频道（注：v0.7.2 fetcher 不稳，等 v0.7.3）
+#   - rss                通用 RSS（小宇宙 / Substack / Megaphone / 任何博客）
+# =============================================================================
 
 newsletter:
-  name: "周小丁的 AI 周报"
-  email_to: "your-email@example.com"   # 收件箱
-  email_from: "your-email@example.com" # 发件箱
+  name: "我的 AI 周报"                    # 刊名（出现在邮件标题、EPUB 标题）
+  email_to: "you@example.com"            # 收件邮箱
+  email_from: "you@example.com"          # 发件邮箱
   smtp:
-    host: "smtp.qq.com"
+    host: "smtp.qq.com"                  # QQ 邮箱用 smtp.qq.com，163 用 smtp.163.com
     port: 465
     use_ssl: true
-    user: "your-email@qq.com"
-    # 密码从环境变量 SMTP_PASS 读取（不要写在文件里）
+    user: "you@example.com"              # SMTP 用户名（一般 = 发件邮箱）
+    # 密码不要写这里！放仓库根目录 .smtp_secret 文件，格式：SMTP_PASS=xxx
 
-# 默认抓取参数
 defaults:
-  days: 7              # 抓近多少天的新内容
-  max_per_channel: 3   # 每个频道最多 N 个新视频
-  cookies_from: null   # 全局 cookies 来源（safari/chrome/null）
+  days: 7              # 每周扫近 N 天新内容
+  max_per_channel: 3   # 每个频道最多 N 条
+  cookies_from: null   # 全局 cookies 来源（一般 null，需要时按源指定）
 
-# 订阅的频道
 channels:
-  # ===== YouTube =====
-  - type: youtube_channel
-    name: "Lex Fridman"
-    # 用 channel_id（频道页 URL 里 /channel/UCxxx）
-    channel_id: "UCSHZKyawb77ixDdsGog4iWA"
+
+  # ---------- B 站 UP 主 ----------
+  # mid 在 https://space.bilibili.com/<mid> URL 里
+  - type: bilibili_uploader
+    name: "大牙大-"
+    mid: "25752587"
+    cookies_from: chrome   # B 站需要登录态：先在 Chrome 里登录 B 站
     enabled: true
 
-  - type: youtube_channel
-    name: "Latent Space"
-    # 也可以用 handle（@xxxx 格式）
-    handle: "@latentspace"
-    enabled: false
-
-  # ===== B 站 =====
-  - type: bilibili_uploader
-    name: "影视飓风"
-    mid: "946974"     # B 站用户 mid（个人页 URL 里 /数字）
-    enabled: false
-
-  # ===== RSS（小宇宙、播客等通用） =====
+  # ---------- 中文播客（小宇宙 RSS）----------
+  # 在 https://podstatus.com 搜节目名，复制 Feed URL
   - type: rss
-    name: "AI 炼金术"
-    url: "https://feeds.xiaoyuzhoufm.com/podcast/xxxxx.xml"
+    name: "张小珺Jùn 商业访谈录"
+    url: "https://feed.xyzfm.space/dk4yh3pkpjp3"
+    enabled: true
+
+  # ---------- 英文播客（Substack / Megaphone RSS）----------
+  - type: rss
+    name: "Latent Space"
+    url: "https://api.substack.com/feed/podcast/1084089.rss"
+    enabled: true
+
+  - type: rss
+    name: "No Priors"
+    url: "https://feeds.megaphone.fm/nopriors"
+    enabled: true
+
+  # ---------- YouTube 频道 ----------
+  # ⚠️ v0.7.2 已知问题：YouTube videos.xml endpoint 不稳定
+  # 想开就开，扫不到内容是行业问题（YouTube 端），不是 skill 的 bug
+  # v0.7.3 计划改用 openrss / UULF playlist_id 后备
+  - type: youtube_channel
+    name: "Lex Fridman"
+    channel_id: "UCSHZKyawb77ixDdsGog4iWA"
     enabled: false
