@@ -266,6 +266,10 @@ def main():
                         help="订阅模式：抓近多少天的新内容（默认按 yaml 配置）")
     parser.add_argument("--send-email", action="store_true",
                         help="订阅模式：发送邮件到 yaml 配置的邮箱")
+    parser.add_argument("--send-only", dest="send_only", default=None,
+                        help="跳过抓取，直接把指定 digest 目录里现成的 weekly-digest.md 发邮件 "
+                             "（Claude 代笔后用这个一键发出）。"
+                             "传入 digest 目录名（如 weekly-2026-W22-20260529）")
     parser.add_argument("--no-cache", action="store_true",
                         help="不使用链接级缓存，强制重抓")
     parser.add_argument("--auto", action="store_true", help="调 LLM API 全自动")
@@ -296,6 +300,45 @@ def main():
 
     # 决定要处理的 URL 列表
     url_items: list[tuple[str, str | None]] = []
+
+    # ===== --send-only 快捷入口：把已写好的 digest 直接发邮件 =====
+    if args.send_only:
+        from digest import send_weekly_email
+        import yaml as _yaml
+
+        if not args.subscribe_file:
+            print("❌ --send-only 需要同时指定 --subscribe channels.yaml 来读取邮箱配置")
+            sys.exit(1)
+
+        yaml_path = Path(args.subscribe_file)
+        scan_min = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+
+        digest_dir = ROOT / "output" / "digest" / args.send_only
+        if not digest_dir.exists():
+            print(f"❌ 找不到 digest 目录：{digest_dir}")
+            sys.exit(1)
+
+        body_md = digest_dir / "weekly-digest.md"
+        if not body_md.exists():
+            # 回退到 fallback
+            body_md = digest_dir / "weekly-digest.fallback.md"
+        if not body_md.exists():
+            print(f"❌ {digest_dir} 里既没有 weekly-digest.md 也没有 fallback 文件")
+            sys.exit(1)
+
+        # 收集附件：EPUB + 投喂包
+        attachments = []
+        for p in digest_dir.iterdir():
+            if p.suffix.lower() in (".epub", ".pdf"):
+                attachments.append(p)
+            elif p.name.endswith(".WEEKLY.prompt.md"):
+                attachments.append(p)
+
+        print(f"\n📤 直发模式：{args.send_only}")
+        print(f"   正文：{body_md.name}")
+        print(f"   附件：{[a.name for a in attachments]}")
+        send_weekly_email(scan_min, body_md, attachments=attachments)
+        return
 
     # ===== 订阅模式 =====
     if args.subscribe_file:
@@ -349,9 +392,51 @@ def main():
         epub_path = build_epub_if_many(ROOT, bundle, threshold=5)
 
         # 邮件
-        if args.send_email and final_md:
+        if args.send_email:
+            from pathlib import Path as _P
+
             attachments = [epub_path] if epub_path else []
-            send_weekly_email(scan, final_md, attachments=attachments)
+            wp = _P(bundle["weekly_prompt_path"])
+            if wp.exists():
+                attachments.append(wp)
+
+            # 邮件正文优先级：
+            #   1) --auto 跑出来的 final_md（API 路线）
+            #   2) Claude 代笔放在 digest 目录的 weekly-digest.md（人机分工路线）
+            #   3) Fallback 占位（最少惊喜）
+            digest_dir = wp.parent
+            human_written = digest_dir / "weekly-digest.md"
+
+            if final_md:
+                body_path = final_md
+                source = "LLM auto"
+            elif human_written.exists():
+                body_path = human_written
+                source = "Claude 代笔"
+            else:
+                # Fallback：没正文也发，至少把附件送达
+                items = bundle.get("epub_candidates", [])
+                fallback_md = (
+                    f"# {scan.get('newsletter', {}).get('name', '订阅周报')}\n\n"
+                    f"> 本周抓到 **{len(items)} 条** 新内容（正文待 Claude 撰写）\n\n"
+                    "## 📦 本期清单\n\n"
+                    + "\n".join(
+                        f"- [{r.get('title','(无标题)')}]({r.get('url','')})"
+                        for r in items
+                    )
+                    + "\n\n## 📎 附件\n\n"
+                    "- **EPUB 电子书**：所有笔记打包，可投递到 Kindle / iPad\n"
+                    "- **完整投喂包（.WEEKLY.prompt.md）**：含全部 transcript\n\n"
+                    "> 💡 把投喂包发给 Claude 即可生成精装周报正文；"
+                    "或加 `--auto` + API key 让 skill 自动撰写。\n"
+                )
+                fb = digest_dir / "weekly-digest.fallback.md"
+                fb.write_text(fallback_md, encoding="utf-8")
+                body_path = fb
+                source = "fallback 占位"
+
+            print(f"📧 邮件正文来源：{source}（{body_path.name}）")
+            send_weekly_email(scan, body_path, attachments=attachments)
 
         # 标记已发
         mark_sent(ROOT, [r["url"] for r in bundle.get("epub_candidates", [])],
