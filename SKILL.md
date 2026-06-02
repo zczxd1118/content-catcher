@@ -83,6 +83,11 @@ python catch.py --subscribe channels.yaml --days 3
 # 每周一早上 9 点跑订阅周报并发邮件
 ```
 
+### 📧 SMTP 踩坑提示
+
+- **`.smtp_secret` 是 KEY=VAL 格式（含注释行）**，不要用 `export SMTP_PASS="$(cat .smtp_secret)"` 整段塞环境变量——会把注释也当 token，登录失败。`email_sender.py` 自带 fallback 解析，让脚本自己读就行（直接 `python catch.py --send-email`，**不要**预先 export）。
+- **中文标题/中文附件名/中文正文**：v0.7.1+ 已修。`EmailMessage` 默认 policy 是 `compat32`（ASCII-only），所以构造时强制传 `policy=SMTP_POLICY` 并给 `set_content`/`add_alternative` 加 `charset="utf-8"`。如果再次出现 `'ascii' codec can't encode characters`，先检查 `email_sender.py` 是不是被退回了旧版。
+
 ## ⚙️ 参数速查
 
 | 参数 | 用途 |

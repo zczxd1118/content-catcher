@@ -3,6 +3,7 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.policy import SMTP as SMTP_POLICY
 from pathlib import Path
 
 
@@ -43,17 +44,20 @@ def send_email(smtp_cfg: dict,
     if not password:
         return False, f"未设置 {password_env}（既没在环境变量、也没在 .smtp_secret 文件里）"
 
-    msg = EmailMessage()
+    # 显式使用 email.policy.SMTP（默认 compat32 是 ASCII-only，
+    # 中文 Subject / From 显示名 / 附件名会触发 'ascii' codec can't encode）。
+    # SMTP policy 会自动按 RFC 2047 编码 header，并按 RFC 6532 处理 UTF-8 正文。
+    msg = EmailMessage(policy=SMTP_POLICY)
     msg["From"] = from_addr
     msg["To"] = to_addr
     msg["Subject"] = subject
 
-    msg.set_content(md_body)
+    msg.set_content(md_body, charset="utf-8")
     html = markdown_to_html(md_body)
     msg.add_alternative(
         f"<html><body style='font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
         f"max-width:680px;margin:0 auto;padding:16px;line-height:1.7'>"
-        f"{html}</body></html>", subtype="html"
+        f"{html}</body></html>", subtype="html", charset="utf-8"
     )
 
     if attachments:
