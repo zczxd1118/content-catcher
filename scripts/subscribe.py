@@ -23,17 +23,36 @@ DEFAULT_UA = (
 )
 
 YT_RSS = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+YT_RSS_PLAYLIST = "https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"
 YT_HANDLE_PAGE = "https://www.youtube.com/{handle}"
 
+# 第三方代理 fallback（按可靠性排序，每个里面 {cid} 会被替换为 channel_id）
+# 这些是"备胎中的备胎"——只在 YouTube 原生 endpoint 持续失败时启用
+YT_RSS_FALLBACK_PROXIES = [
+    "https://rsshub.app/youtube/channel/{cid}",          # RSSHub 官方主站
+    "https://rsshub.rssforever.com/youtube/channel/{cid}",  # 国内可用的 RSSHub 镜像
+    "https://yewtu.be/feed/channel/{cid}",               # Invidious 公共实例
+    "https://invidious.fdn.fr/feed/channel/{cid}",       # Invidious 备用
+]
 
-def http_get(url: str, timeout: int = 20) -> bytes | None:
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": DEFAULT_UA})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read()
-    except Exception as e:
-        print(f"   [http_get] {url[:80]} → {e}", file=sys.stderr)
-        return None
+
+def http_get(url: str, timeout: int = 20, quiet: bool = False,
+             retries: int = 1, backoff: float = 1.0) -> bytes | None:
+    """HTTP GET，支持简单的指数退避重试（针对 YouTube 这种间歇性 5xx 友好）。"""
+    import time as _t
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": DEFAULT_UA})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except Exception as e:
+            last_err = e
+            if attempt < retries:
+                _t.sleep(backoff * (2 ** attempt))
+    if not quiet:
+        print(f"   [http_get] {url[:80]} → {last_err}", file=sys.stderr)
+    return None
 
 
 # ---------- YouTube ----------
@@ -51,6 +70,97 @@ def resolve_handle_to_channel_id(handle: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _parse_youtube_atom(xml: bytes, source_name: str) -> list[dict]:
+    """解析 YouTube Atom feed（原生 videos.xml + openrss 都是 Atom 格式）。
+    返回 [] 表示空 feed（视为这一路 fetch 失败）。"""
+    items: list[dict] = []
+    try:
+        ns = {"atom": "http://www.w3.org/2005/Atom",
+              "media": "http://search.yahoo.com/mrss/",
+              "yt": "http://www.youtube.com/xml/schemas/2015"}
+        root = ET.fromstring(xml)
+        for entry in root.findall("atom:entry", ns):
+            vid_el = entry.find("yt:videoId", ns)
+            title = entry.find("atom:title", ns)
+            published = entry.find("atom:published", ns)
+            link = entry.find("atom:link", ns)
+
+            # openrss 没有 yt:videoId namespace，从 <link href> 解析
+            vid = None
+            if vid_el is not None and vid_el.text:
+                vid = vid_el.text.strip()
+            elif link is not None:
+                href = link.attrib.get("href", "")
+                m = re.search(r"v=([\w-]{11})", href) or re.search(r"/([\w-]{11})$", href)
+                if m:
+                    vid = m.group(1)
+
+            if not vid or title is None:
+                continue
+
+            items.append({
+                "url": f"https://www.youtube.com/watch?v={vid}",
+                "title": (title.text or "").strip(),
+                "published": published.text if published is not None else None,
+                "source_name": source_name,
+                "source_type": "youtube_channel",
+            })
+    except ET.ParseError as e:
+        # XML 解析失败，让上层试下一个 fetcher
+        return []
+    except Exception as e:
+        print(f"   [{source_name}] 解析 YouTube feed 异常：{e}")
+        return []
+    return items
+
+
+def _fetch_youtube_feed(channel_id: str, source_name: str) -> list[dict]:
+    """YouTube feed fetcher chain（按稳定性 / 速度排序）：
+      1. 原生 videos.xml?channel_id=UCxxx           —— YouTube 官方，有重试
+      2. videos.xml?playlist_id=UULFxxx             —— UC→UULF 变体，自动滤 Shorts
+      3. RSSHub / Invidious 公共实例（第三方代理）  —— 备胎中的备胎，可能限流
+
+    背景：YouTube 在 2025 年开始让原生 videos.xml endpoint 间歇性 5xx/404
+    （见 Open RSS 项目对 YouTube 的公开投诉）。靠重试 + 多 fetcher 来兜底。
+
+    任何一路返回非空 items 立即停止；全失败时返回 []。
+    """
+    # 1. 原生 channel_id（带 2 次重试）
+    xml = http_get(YT_RSS.format(channel_id=channel_id), quiet=True, retries=2)
+    if xml:
+        items = _parse_youtube_atom(xml, source_name)
+        if items:
+            return items
+        print(f"   [{source_name}] 原生 videos.xml 返回但 0 item，尝试 fallback...")
+    else:
+        print(f"   [{source_name}] 原生 videos.xml 失败，尝试 fallback...")
+
+    # 2. UC→UULF playlist_id（同源 endpoint 但走另一条 backend 路径）
+    if channel_id.startswith("UC"):
+        playlist_id = "UULF" + channel_id[2:]
+        xml = http_get(YT_RSS_PLAYLIST.format(playlist_id=playlist_id),
+                       quiet=True, retries=1)
+        if xml:
+            items = _parse_youtube_atom(xml, source_name)
+            if items:
+                print(f"   [{source_name}] ✅ UULF playlist 后备生效")
+                return items
+
+    # 3. 第三方代理逐个试
+    for proxy_template in YT_RSS_FALLBACK_PROXIES:
+        url = proxy_template.format(cid=channel_id)
+        xml = http_get(url, quiet=True, timeout=15)
+        if xml:
+            items = _parse_youtube_atom(xml, source_name)
+            if items:
+                host = url.split("/")[2]
+                print(f"   [{source_name}] ✅ 代理 {host} 生效")
+                return items
+
+    print(f"   [{source_name}] ❌ 所有 YouTube fetcher 全部失败")
+    return []
+
+
 def scan_youtube_channel(cfg: dict) -> list[dict]:
     """返回 [{url, title, published, source_name}, ...]"""
     cid = cfg.get("channel_id")
@@ -62,35 +172,7 @@ def scan_youtube_channel(cfg: dict) -> list[dict]:
         print(f"   [{cfg['name']}] 缺 channel_id，跳过")
         return []
 
-    xml = http_get(YT_RSS.format(channel_id=cid))
-    if not xml:
-        return []
-
-    items = []
-    try:
-        # YouTube RSS 是 Atom 格式
-        ns = {"atom": "http://www.w3.org/2005/Atom",
-              "media": "http://search.yahoo.com/mrss/",
-              "yt": "http://www.youtube.com/xml/schemas/2015"}
-        root = ET.fromstring(xml)
-        for entry in root.findall("atom:entry", ns):
-            vid = entry.find("yt:videoId", ns)
-            title = entry.find("atom:title", ns)
-            published = entry.find("atom:published", ns)
-            link = entry.find("atom:link", ns)
-            if vid is None or title is None:
-                continue
-            url = f"https://www.youtube.com/watch?v={vid.text}"
-            items.append({
-                "url": url,
-                "title": title.text,
-                "published": published.text if published is not None else None,
-                "source_name": cfg["name"],
-                "source_type": "youtube_channel",
-            })
-    except Exception as e:
-        print(f"   [{cfg['name']}] 解析 RSS 失败：{e}")
-    return items
+    return _fetch_youtube_feed(cid, cfg["name"])
 
 
 # ---------- 通用 RSS ----------

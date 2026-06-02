@@ -125,10 +125,18 @@ print(m.group(1) if m else 'NOT FOUND')
 "
 ```
 
-> ⚠️ **YouTube 当前已知问题（2025+）**：YouTube 的 `videos.xml?channel_id=` RSS endpoint 间歇性 404/500。
-> v0.7.2 版本的 subscribe.py 仍用这个 endpoint，**所以 YouTube 源经常扫不到内容**。
-> 已记入 v0.7.3 路线图，会改成 `openrss.org` / `playlist_id=UULF...` 后备。
-> **当前建议**：YouTube 源全部先 `enabled: false`，等 fetcher 修了再开。
+> 🛠 **YouTube fetcher chain（v0.7.3 起）**：
+> 由于 YouTube 在 2025 年起让原生 `videos.xml` endpoint 间歇 5xx/404，
+> v0.7.3 版本的 `subscribe.scan_youtube_channel` 改成多级 fetcher：
+>
+> 1. 原生 `videos.xml?channel_id=` —— 带 2 次重试（指数退避）
+> 2. `videos.xml?playlist_id=UULF...` —— 替换 UC 前缀，可过滤 Shorts
+> 3. 第三方代理 —— RSSHub / Invidious 公共实例逐个试
+>
+> **任何一路返回非空 items 立即停止**，全失败时打印明确日志并返回 []。
+>
+> 实际效果：稳定网络下原生大概率第 1 步就成；遇到 YouTube 端临时挂掉时自动降级。
+> 如果某频道连续多周扫不到内容，**先在浏览器试一下原 URL 看是不是 YouTube 端正在维护**。
 
 ### 类型 C：通用 RSS（播客 / Substack / 博客）
 
@@ -260,8 +268,11 @@ catch.py --subscribe channels.yaml --send-only <本期目录名>
 
 ### Q: 加了一堆 YouTube 源都扫不到？
 
-- 这是 YouTube `videos.xml` endpoint 在 2025 年间歇性 404 的行业问题（不是 skill bug）
-- 暂时把 YouTube 源 `enabled: false`，等 v0.7.3 改用 openrss/UULF 后备路径
+- v0.7.3 已经加了 fetcher chain（原生 → UULF playlist → RSSHub/Invidious 代理），多数情况都能 fallback 到结果
+- 若仍然 0 条：
+  1. 看日志最后那行 `❌ 所有 YouTube fetcher 全部失败` —— 说明所有路径都被网络挡了
+  2. 浏览器打开 `https://www.youtube.com/feeds/videos.xml?channel_id=<你的UC...>` 直接看（YouTube 端可能短暂维护）
+  3. 检查 RSSHub / Invidious 公共实例是否被你所在网络环境屏蔽（中国大陆访问会比较挑实例）
 
 ### Q: 一次跑订阅时间超久（被前台 shell 切了）？
 
