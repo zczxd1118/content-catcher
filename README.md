@@ -1,8 +1,65 @@
-# 🎯 content-catcher
+# 📡 content-catcher
 
-> 多平台音视频/图文转结构化笔记的 Skill —— **链接进，精装文/周报/对比报告出**。
+> **Personal Information Distillery + Newsletter Engine**
+>
+> 一个"信息蒸馏 + Newsletter"基础设施 —— 把任何长内容（音视频 / 图文 / 播客）
+> 变成"被精选过"的笔记。既能单条按需调用（Skill 形态），
+> 也能订阅式自动推送到邮箱（Newsletter 形态）。
 
-支持 **YouTube / B 站 / 小红书 / 苹果播客 / Spotify / 小宇宙 / Substack 播客** 等 7+ 平台，**1 行命令**或 `@skill` 调用，**1-15 分钟**拿到产物。
+[![GitHub release](https://img.shields.io/github/v/release/zczxd1118/content-catcher)](https://github.com/zczxd1118/content-catcher/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+---
+
+## 🎯 它不只是一个 Skill
+
+很多人第一眼会以为这是"链接转笔记的小工具"，但实际上它是个**4 层架构**的内容基础设施：
+
+```
+                    👁️ 用户感知层
+                         │
+┌────────────────────────┼────────────────────────┐
+│ Layer 4: Newsletter 系统（产品形态）              │
+│   订阅源 → 抓取 → 蒸馏 → 邮件推送 → EPUB 附件      │
+│   类比：Refind / Substack / Snipd                │
+└────────────────────────┬────────────────────────┘
+                         │ 由这一层支撑
+┌────────────────────────┼────────────────────────┐
+│ Layer 3: 内容处理工具（CLI / Skill 形态）         │
+│   一行命令 / @skill → 拿到笔记                   │
+│   类比：yt-dlp / faster-whisper / 单一 AI Skill  │
+└────────────────────────┬────────────────────────┘
+                         │ 由这一层支撑
+┌────────────────────────┼────────────────────────┐
+│ Layer 2: Prompt 工程库（核心壁垒）⭐             │
+│   8 个精心打磨的模板：中文/英文/小红书/精装/批量/对比 │
+│   这才是真正的"产品 know-how"                    │
+└────────────────────────┬────────────────────────┘
+                         │ 由这一层支撑
+┌────────────────────────┴────────────────────────┐
+│ Layer 1: 技术管线（基础设施）                     │
+│   字幕抓取 + Whisper 转写 + RSS 探测 +            │
+│   Cookies 注入 + 长内容分段 + 缓存 + 失败容错      │
+└─────────────────────────────────────────────────┘
+```
+
+**所以**：
+- 当你 `python catch.py URL` —— 你在用 **Layer 3（工具）**
+- 当你 `@content-catcher` 调它 —— 你在用 **Layer 3（Skill）**
+- 当你 `--subscribe + --send-email` —— 你在用 **Layer 4（Newsletter）**
+- 当你看到产物质量惊艳 —— 那是 **Layer 2 的功劳**
+
+---
+
+## 🆚 跟同类产品的差异
+
+| 同类产品 | 它的定位 | content-catcher 的差异 |
+|---------|---------|---------------------|
+| **Snipd / Podwise** | 播客转笔记 SaaS | 多平台 + 多形态 + 用户掌控成本 |
+| **Refind** | AI 推荐 Newsletter | 用户掌控订阅源 + 中文圈友好 |
+| **yt-dlp** | 纯下载工具 | 之上加 AI 蒸馏层 + Newsletter 形态 |
+| **单一 AI Skill** | 一个 Prompt 包 | 8 模板 + 完整管线 + 订阅闭环 |
 
 ---
 
