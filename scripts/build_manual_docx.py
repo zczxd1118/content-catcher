@@ -23,11 +23,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "output" / "manual"
-OUT_DOCX = OUT_DIR / "content-catcher-v0.8.0-项目说明.docx"
+OUT_DOCX = OUT_DIR / "content-catcher-v0.8.0-项目说明书.docx"
 
-# 我们假设这个脚本附近有 .js 源（同名同目录，扩展名 .js）
-# 实际工程上：脚本和 .js 都放 scripts/ 下
-JS_SOURCE = ROOT / "scripts" / "build_manual_docx.js"
+# v2 是详细版（10 章骨架），v1 是早期 8 章简化版（已不维护）
+JS_SOURCE = ROOT / "scripts" / "build_manual_v2_docx.js"
 NODE_MODULES = Path.home() / ".workbuddy/binaries/node/workspace/node_modules"
 NODE_BIN = Path.home() / ".workbuddy/binaries/node/versions/22.22.2/bin/node"
 

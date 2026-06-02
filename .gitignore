@@ -2,9 +2,9 @@
 .smtp_secret
 *.env
 
-# 产物（每次运行都会重新生成）
+# 产物（每次运行都会重新生成；output 可能是 symlink，所以 dir 和 file 形式都写）
 output/
-output       # 软链版本（开发者 setup 用）
+output
 models/
 __pycache__/
 *.pyc
