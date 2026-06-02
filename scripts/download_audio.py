@@ -2,8 +2,11 @@
 import subprocess
 from pathlib import Path
 
+from _bin import require_bin
 
-YTDLP_BIN = "/Users/zoezczhou/.workbuddy/binaries/python/envs/content-catcher/bin/yt-dlp"
+
+def _ytdlp() -> str:
+    return require_bin("yt-dlp", "pip install yt-dlp")
 
 
 def download_audio(url: str, out_dir: Path,
@@ -17,7 +20,7 @@ def download_audio(url: str, out_dir: Path,
     out_template = str(out_dir / "%(id)s.%(ext)s")
 
     cmd = [
-        YTDLP_BIN,
+        _ytdlp(),
         "-f", "bestaudio/best",
         "-x",                    # extract audio
         "--audio-format", audio_format,
@@ -34,7 +37,7 @@ def download_audio(url: str, out_dir: Path,
     try:
         # 先拿视频 id
         id_proc = subprocess.run(
-            [YTDLP_BIN, "--get-id", "--no-playlist", url],
+            [_ytdlp(), "--get-id", "--no-playlist", url],
             capture_output=True, text=True, timeout=60,
         )
         video_id = id_proc.stdout.strip()

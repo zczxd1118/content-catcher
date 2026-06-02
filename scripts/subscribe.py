@@ -240,7 +240,11 @@ def scan_bilibili_uploader(cfg: dict) -> list[dict]:
 
     # 优先：yt-dlp + cookies
     import subprocess
-    YTDLP_BIN = "/Users/zoezczhou/.workbuddy/binaries/python/envs/content-catcher/bin/yt-dlp"
+    from _bin import find_bin
+    YTDLP_BIN = find_bin("yt-dlp")
+    if not YTDLP_BIN:
+        print(f"   [{cfg['name']}] 找不到 yt-dlp，跳过 B 站抓取（pip install yt-dlp）")
+        return []
     # 用 flat-playlist 拿 url 列表（快）；但 flat 模式下 title/timestamp 缺失
     # 所以再用 --print 单独取每个视频的 metadata
     cmd = [

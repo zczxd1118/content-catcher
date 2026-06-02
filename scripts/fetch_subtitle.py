@@ -9,7 +9,9 @@ from pathlib import Path
 from detect_platform import detect_platform, extract_youtube_id
 
 
-YTDLP_BIN = "/Users/zoezczhou/.workbuddy/binaries/python/envs/content-catcher/bin/yt-dlp"
+from _bin import require_bin
+def _ytdlp() -> str:
+    return require_bin("yt-dlp", "pip install yt-dlp")
 
 
 def fetch_youtube_subtitle(url: str) -> tuple[str | None, str | None]:
@@ -51,7 +53,7 @@ def fetch_via_ytdlp(url: str, out_dir: Path,
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
-        YTDLP_BIN,
+        _ytdlp(),
         "--skip-download",
         "--write-subs",
         "--write-auto-subs",

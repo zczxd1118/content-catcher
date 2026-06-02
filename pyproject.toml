@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "content-catcher"
+version = "0.8.0"
+description = "Personal Information Distillery + Newsletter Engine — turn long-form audio/video/posts into curated notes, with subscription-based weekly EPUB + email."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "zczxd1118" },
+]
+keywords = [
+    "newsletter", "rss", "podcast", "youtube", "bilibili",
+    "whisper", "transcription", "epub", "llm-agent", "ai-engineering"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Email",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+
+dependencies = [
+    "PyYAML>=6.0",
+    "yt-dlp>=2024.1.0",
+    "faster-whisper>=1.0.0",
+    "av>=11.0",
+    "trafilatura>=1.6",
+    "feedparser>=6.0",
+    "markdown>=3.5",
+    "Pygments>=2.16",
+    "EbookLib>=0.18",
+    "lxml>=4.9",
+]
+
+[project.optional-dependencies]
+# 测试
+test = [
+    "pytest>=8.0",
+]
+# 接 LLM API（用户可选——本项目默认 LLM 写作由对话方完成）
+llm = [
+    "anthropic>=0.40",
+    "openai>=1.50",
+]
+
+[project.urls]
+Homepage = "https://github.com/zczxd1118/content-catcher"
+Documentation = "https://github.com/zczxd1118/content-catcher/blob/main/docs/MANUAL.md"
+Repository = "https://github.com/zczxd1118/content-catcher"
+Issues = "https://github.com/zczxd1118/content-catcher/issues"
+Changelog = "https://github.com/zczxd1118/content-catcher/blob/main/CHANGELOG.md"
+
+[project.scripts]
+catch = "catch:main"
+
+[tool.setuptools]
+# 仓库扁平布局：catch.py 在根、scripts/* 是普通 .py
+# 用 py-modules 把它们当顶层模块发布
+py-modules = ["catch"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.example.yaml", "*.md"]

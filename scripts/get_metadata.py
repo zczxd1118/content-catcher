@@ -3,12 +3,12 @@ import subprocess
 import json
 from pathlib import Path
 
-
-YTDLP_BIN = "/Users/zoezczhou/.workbuddy/binaries/python/envs/content-catcher/bin/yt-dlp"
+from _bin import require_bin
 
 
 def get_metadata(url: str, cookies_from: str = None) -> dict:
-    cmd = [YTDLP_BIN, "--dump-single-json", "--skip-download", "--no-warnings"]
+    ytdlp = require_bin("yt-dlp", "pip install yt-dlp")
+    cmd = [ytdlp, "--dump-single-json", "--skip-download", "--no-warnings"]
     if cookies_from:
         cmd += ["--cookies-from-browser", cookies_from]
     cmd.append(url)

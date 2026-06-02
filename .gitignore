@@ -4,6 +4,7 @@
 
 # 产物（每次运行都会重新生成）
 output/
+output       # 软链版本（开发者 setup 用）
 models/
 __pycache__/
 *.pyc
@@ -18,3 +19,10 @@ autoglm_urls.txt
 
 # 本地私人偏好（仅在本机）
 LOCAL_NOTES.md
+
+# Python packaging
+.venv/
+venv/
+*.egg-info/
+build/
+dist/

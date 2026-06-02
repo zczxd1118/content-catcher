@@ -1,0 +1,24 @@
+# content-catcher 核心运行时依赖
+# 这是"装上就能用"的最小集——发邮件、订阅扫描、EPUB 导出都能跑
+
+# 配置和 RSS 解析
+PyYAML>=6.0
+
+# 抓取
+yt-dlp>=2024.1.0          # 视频/音频抓取（YouTube/B站/播客主站等）
+
+# 转写（本地 Whisper）
+faster-whisper>=1.0.0     # PyTorch-free 的 Whisper，跑得动 CPU
+av>=11.0                  # ffmpeg 替代，faster-whisper 的解码依赖
+
+# 长内容抓取
+trafilatura>=1.6          # 网页正文提取（播客主站 fallback）
+feedparser>=6.0           # 更宽容的 RSS 解析
+
+# 邮件 + Markdown 渲染
+markdown>=3.5             # 周报 / EPUB 章节 Markdown → HTML
+Pygments>=2.16            # 代码块高亮（可选，markdown codehilite 用）
+
+# EPUB 生成
+EbookLib>=0.18
+lxml>=4.9                 # EbookLib 依赖

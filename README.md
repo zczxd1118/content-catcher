@@ -12,6 +12,26 @@
 
 ---
 
+## ⚡ 5 分钟跑起来
+
+```bash
+git clone https://github.com/zczxd1118/content-catcher.git
+cd content-catcher
+./install.sh                                       # 一键建 venv + 装依赖 + 准备配置
+source .venv/bin/activate
+
+# 单条整理
+catch.py https://www.bilibili.com/video/BV1xxxxxx --cookies-from chrome
+
+# 跑订阅周报
+cp channels.example.yaml channels.yaml             # 改成你自己的订阅源
+catch.py --subscribe channels.yaml
+```
+
+📖 **完整文档**：[`docs/MANUAL.md`](./docs/MANUAL.md) · 📡 订阅源管理：[`docs/SUBSCRIPTION_GUIDE.md`](./docs/SUBSCRIPTION_GUIDE.md) · 📝 变更记录：[`CHANGELOG.md`](./CHANGELOG.md)
+
+---
+
 ## 🎯 它不只是一个 Skill
 
 很多人第一眼会以为这是"链接转笔记的小工具"，但实际上它是个**4 层架构**的内容基础设施：
