@@ -250,7 +250,7 @@ python tests/test_youtube_fetcher_chain.py   # YouTube 多级 fallback
 - [ ] Whisper 模型自动按需切换（短视频 tiny / 长视频 small）
 - [ ] EPUB 自动加封面图
 - [ ] Windows 一键安装脚本
-- [ ] 升级为 Agent（基于此项目的 [content-curator](https://github.com/zczxd1118/content-curator)）
+- [ ] 升级为 Agent
 
 ---
 
